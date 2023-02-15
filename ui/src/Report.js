@@ -11,6 +11,7 @@ import GherkinResults from './GherkinResult';
 
 import { useEffect, useState } from 'react';
 import { FETCH_PATH } from './environment'
+import SchemaResult from './SchemaResult';
 
 function Report() {
   const [isLoggedIn, setLogin] = useState(false);
@@ -88,7 +89,7 @@ function Report() {
           <GeneralTable data={reportData} type={"overview"} />
 
           <MinimalTreeView status={reportData["model"]["status_syntax"]} summary={"Syntax"} content={reportData["results"]["syntax_result"]["msg"]} />
-          <MinimalTreeView status={reportData["model"]["status_schema"]} summary={"Schema"} content={reportData["results"]["schema_result"]["msg"]} />
+          <SchemaResult status={reportData["model"]["status_schema"]} content={reportData["results"]["schema_result"]} instances={reportData.instances} />
 
           <BsddTreeView status={reportData["model"]["status_bsdd"]} summary={"bSDD"} bsddResults={reportData["results"]["bsdd_results"]} />
 
