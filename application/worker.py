@@ -70,6 +70,7 @@ class task(object):
         import inspect
         print(self.__class__.__name__, inspect.getfile(type(self)), *progress_map)
         self.begin, self.end = progress_map
+        self.validation_task_id=None
 
     def sub_progress(self, i):
         set_progress(self.id, self.begin + (self.end - self.begin) * i / 100.)
@@ -105,6 +106,8 @@ class syntax_validation_task(task):
             session.add(validation_task)
             session.commit()
             validation_task_id = str(validation_task.id)
+            self.validation_task_id = validation_task_id
+          
             
             output = proc.stderr
             output = output.decode("utf-8", errors='ignore').strip()
@@ -194,7 +197,9 @@ class gherkin_validation_task(task):
             validation_task = self.db_class(model.id)
             session.add(validation_task)
             session.commit()
-            validation_task_id = str(validation_task.id)       
+            validation_task_id = str(validation_task.id)
+            self.validation_task_id = validation_task_id
+            
 
         env_copy = os.environ.copy()
         env_copy['GHERKIN_REPO_DIR'] = self.repo_dir
@@ -228,6 +233,7 @@ class bsdd_validation_task(task):
         session.add(validation_task)
         session.commit()
         validation_task_id = str(validation_task.id)
+        self.validation_task_id = validation_task_id
         session.close()
 
         check_program = os.path.join(os.getcwd() + "/checks", "check_bsdd_v2.py")
@@ -435,7 +441,7 @@ def do_process(id, validation_config, commit_id, ids_spec):
         nonlocal elapsed
         begin_end = (elapsed / total_est_time * 99, (elapsed + t.est_time) / total_est_time * 99)
         task = t(begin_end)
-        
+
         # In case we're running a 'sandbox' for a specific commit_id, we have cloned the repository
         # to a temporary directory stored in this variable.
         if gherkin_repo_dir:
@@ -445,7 +451,19 @@ def do_process(id, validation_config, commit_id, ids_spec):
                 t.repo_dir = gherkin_repo_dir
 
         try:
+            from datetime import datetime
+            start_time = datetime.now()
             task(d, *args)
+            end_time = datetime.now()
+            try:
+                vt_id = task.validation_task_id
+                with database.Session() as session:
+                    validation_task = session.query(database.validation_task).filter(database.validation_task.id == vt_id).all()[0]
+                    validation_task.validation_start_time = start_time
+                    validation_task.validation_end_time = end_time
+                    session.commit()
+            except:
+                traceback.print_exc(file=sys.stdout)
         except:
             traceback.print_exc(file=sys.stdout)
             # Mark ID as failed
@@ -483,7 +501,7 @@ def do_process(id, validation_config, commit_id, ids_spec):
         <img src="{os.getenv("SERVER_NAME")}/static/navbar/BuildingSMART_CMYK_validation_service.png" width="250px" height="60px"/>'
         email_text = "File checked."
         user = session.query(database.user).filter(database.user.id == model.user_id).all()[0]
-    utils.send_message(email_text, user.email, html_notification)
+    utils.send_message(email_text, [user.email], html_notification)
     print(f'for file {id} email sent to {user.email} with content {html_notification}')
 
     elapsed = 100
@@ -499,8 +517,7 @@ def process(ids, validation_config, commit_id=None, ids_spec=None , callback_url
         traceback.print_exc(file=sys.stdout)
 
         status = "failure"
-        for id in ids:    
-            set_progress(id, -2)
+        set_progress(ids, -2)
 
     if callback_url is not None:       
         r = requests.post(callback_url, data={"status": status, "id": ids})
