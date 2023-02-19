@@ -5,13 +5,13 @@ import { useParams } from 'react-router-dom'
 import Footer from './Footer'
 import Grid from '@mui/material/Grid';
 import GeneralTable from './GeneralTable';
-import MinimalTreeView from './MinimalTreeView.js'
+import SyntaxResult from './SyntaxResult.js'
+import SchemaResult from './SchemaResult';
 import BsddTreeView from './BsddTreeView'
 import GherkinResults from './GherkinResult';
 
 import { useEffect, useState } from 'react';
 import { FETCH_PATH } from './environment'
-import SchemaResult from './SchemaResult';
 
 function Report() {
   const [isLoggedIn, setLogin] = useState(false);
@@ -88,7 +88,7 @@ function Report() {
           <GeneralTable data={reportData} type={"general"} />
           <GeneralTable data={reportData} type={"overview"} />
 
-          <MinimalTreeView status={reportData["model"]["status_syntax"]} summary={"Syntax"} content={reportData["results"]["syntax_result"]["msg"]} />
+          <SyntaxResult status={reportData["model"]["status_syntax"]} content={reportData["results"]["syntax_result"]} />
           <SchemaResult status={reportData["model"]["status_schema"]} content={reportData["results"]["schema_result"]} instances={reportData.instances} />
 
           <BsddTreeView status={reportData["model"]["status_bsdd"]} summary={"bSDD"} bsddResults={reportData["results"]["bsdd_results"]} />
