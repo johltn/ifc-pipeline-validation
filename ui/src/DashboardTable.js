@@ -62,36 +62,6 @@ function computeRelativeDates(modelDate) {
   }
 }
 
-function descendingComparator(a, b, orderBy) {
-  if (b[orderBy] < a[orderBy]) {
-    return -1;
-  }
-  if (b[orderBy] > a[orderBy]) {
-    return 1;
-  }
-  return 0;
-}
-
-function getComparator(order, orderBy) {
-  return order === 'desc'
-    ? (a, b) => descendingComparator(a, b, orderBy)
-    : (a, b) => -descendingComparator(a, b, orderBy);
-}
-
-// This method is created for cross-browser compatibility, if you don't
-// need to support IE11, you can use Array.prototype.sort() directly
-function stableSort(array, comparator) {
-  const stabilizedThis = array.map((el, index) => [el, index]);
-  stabilizedThis.sort((a, b) => {
-    const order = comparator(a[0], b[0]);
-    if (order !== 0) {
-      return order;
-    }
-    return a[1] - b[1];
-  });
-  return stabilizedThis.map((el) => el[0]);
-}
-
 const headCells = [
   {
     id: 'filename',
@@ -152,9 +122,6 @@ const headCells = [
 function EnhancedTableHead(props) {
   const { onSelectAllClick, order, orderBy, numSelected, rowCount, onRequestSort } =
     props;
-  const createSortHandler = (property) => (event) => {
-    onRequestSort(event, property);
-  };
 
   return (
     <TableHead>
@@ -175,20 +142,8 @@ function EnhancedTableHead(props) {
             key={headCell.id}
             align={headCell.numeric ? 'right' : 'left'}
             padding={headCell.disablePadding ? 'none' : 'normal'}
-            sortDirection={orderBy === headCell.id ? order : false}
           >
-            <TableSortLabel
-              active={orderBy === headCell.id}
-              direction={orderBy === headCell.id ? order : 'asc'}
-              onClick={createSortHandler(headCell.id)}
-            >
-              {headCell.label}
-              {orderBy === headCell.id ? (
-                <Box component="span" sx={visuallyHidden}>
-                  {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
-                </Box>
-              ) : null}
-            </TableSortLabel>
+            {headCell.label}
           </TableCell>
         ))}
       </TableRow>
@@ -198,10 +153,7 @@ function EnhancedTableHead(props) {
 
 EnhancedTableHead.propTypes = {
   numSelected: PropTypes.number.isRequired,
-  onRequestSort: PropTypes.func.isRequired,
   onSelectAllClick: PropTypes.func.isRequired,
-  order: PropTypes.oneOf(['asc', 'desc']).isRequired,
-  orderBy: PropTypes.string.isRequired,
   rowCount: PropTypes.number.isRequired,
 };
 
@@ -261,37 +213,30 @@ export default function DashboardTable({ models }) {
   const [page, setPage] = React.useState(0);
   const [dense, setDense] = React.useState(false);
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
-  const [count, setCount] = React.useState(0)
-  const [validating, setValidating] = React.useState(false)
-  const [deleted, setDeleted] = useState('')
-  
-  const splittedUrl = window.location.href.split("/")
+  const [count, setCount] = React.useState(0);
+  const [deleted, setDeleted] = useState('');
+  const [progress, setProgress] = useState(0);
+
+  const splittedUrl = window.location.href.split("/");
 
   const [sandboxCommit, setSandbox] = useState(
-      splittedUrl.includes("sandbox")?
-      splittedUrl.at(-1):false);
-      
+    splittedUrl.includes("sandbox") ?
+      splittedUrl.at(-1) : false);
+
   useEffect(() => {
     fetch(`${FETCH_PATH}/api/models_paginated/${page * rowsPerPage}/${page * rowsPerPage + rowsPerPage}`)
       .then((response) => response.json())
       .then((json) => {
-        setRows(json["models"])
-        setCount(json["count"])
+        setRows(json["models"]);
+        setCount(json["count"]);
         json["models"].map((m) => {
-          if (validating == true) {
-            setValidating(false)
-          } else {
-            setValidating(true)
+          if (m.progress < 100) {
+            setProgress(progress + m.progress + 3);
           }
         })
       });
-  }, [page, rowsPerPage, validating]);
+  }, [page, rowsPerPage, progress]);
 
-  const handleRequestSort = (event, property) => {
-    const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
-  };
 
   const handleSelectAllClick = (event) => {
     if (event.target.checked) {
@@ -362,17 +307,13 @@ export default function DashboardTable({ models }) {
           >
             <EnhancedTableHead
               numSelected={selected.length}
-              order={order}
-              orderBy={orderBy}
               onSelectAllClick={handleSelectAllClick}
-              onRequestSort={handleRequestSort}
               rowCount={rows.length}
             />
             <TableBody>
               {/* if you don't need to support IE11, you can replace the `stableSort` call with:
                  rows.sort(getComparator(order, orderBy)).slice() */}
-              {stableSort(rows, getComparator(order, orderBy))
-                .map((row, index) => {
+              {rows.map((row, index) => {
                   const isItemSelected = isSelected(row.id);
                   const labelId = `enhanced-table-checkbox-${index}`;
                   if (row.progress == 100) {
@@ -402,8 +343,8 @@ export default function DashboardTable({ models }) {
                         <TableCell align="right">{statusToIcon[row.status_ia]}</TableCell>
                         <TableCell align="right">{statusToIcon[row.status_ip]}</TableCell>
                         <TableCell align="right">
-                       
-                          <Link href={sandboxCommit?`/sandbox/report/${sandboxCommit}/${row.code}`:`/report/${row.code}`} underline="hover">
+
+                          <Link href={sandboxCommit ? `/sandbox/report/${sandboxCommit}/${row.code}` : `/report/${row.code}`} underline="hover">
                             {'View report'}
                           </Link>
                         </TableCell>
@@ -435,14 +376,6 @@ export default function DashboardTable({ models }) {
                             }}
                           />
                         </TableCell>
-                        <TableCell
-                          component="th"
-                          id={labelId}
-                          scope="row"
-                          padding="none"
-                        >
-                          IFC
-                        </TableCell>
                         <TableCell align="right">{row.filename}</TableCell>
                         <TableCell align="right">{statusToIcon[row.status_syntax]}</TableCell>
                         <TableCell align="right">{statusToIcon[row.status_schema]}</TableCell>
@@ -450,7 +383,12 @@ export default function DashboardTable({ models }) {
                         <TableCell align="right">{statusToIcon[row.status_ia]}</TableCell>
                         <TableCell align="right">{statusToIcon[row.status_ip]}</TableCell>
                         <TableCell align="right"></TableCell>
-                        <TableCell align="right"><CircularStatic value={row.progress} /></TableCell>
+                        <TableCell align="right">
+                          {
+                            (row.progress == -1) ? <Typography>{"in queue"}</Typography> :
+                              ((row.progress == -2) ? <Typography>{"an error occured"}</Typography> : <CircularStatic value={row.progress} />)
+                          }
+                        </TableCell>
                         <TableCell align="right">
                           <Link href={`${FETCH_PATH}/api/download/${row.id}`} underline="hover">
                             {'Download file'}
